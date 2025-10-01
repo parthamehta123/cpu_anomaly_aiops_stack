@@ -1,134 +1,120 @@
-# CPU Anomaly AIOps Stack
+# CPU Anomaly AIOps Stack 🚀
 
-This project is a minimal end-to-end AIOps demo with FastAPI, Prometheus metrics, CPU anomaly alerting, and drift retraining.
+This project deploys a **CPU anomaly detection and monitoring stack** on Kubernetes using:
 
-## Features
-- 🚦 FastAPI service with `/healthz`, `/metrics`, `/predict` endpoints
-- 📊 Prometheus-compatible metrics (`cpu_usage_percent`)
-- ⚡ CPU anomaly detection alerts when usage >90% for 5+ minutes
-- 🔁 Retrain-on-drift placeholder for future model updates
-- 🐳 Docker + Kubernetes deployment ready
-- 🤖 GitHub Actions workflow to auto-build & push Docker images
+- **FastAPI (Anomaly Service)** → exposes `/metrics` endpoint with CPU usage.
+- **Prometheus Operator** → scrapes application metrics via `ServiceMonitor`.
+- **Grafana** → visualizes CPU usage and anomalies.
+- **PrometheusRules** → defines alerting rules for CPU anomalies.
 
 ---
 
-## Quickstart (Local)
+## 📦 Components
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
+### 1. **Anomaly Service**
+- Runs as a Kubernetes **Deployment** with resource requests/limits.
+- Exposes:
+  - `/healthz` for liveness/readiness probes.
+  - `/metrics` for Prometheus scraping.
+- Service: `anomaly-service` (port `8000`).
 
-- Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)  
-- Healthcheck: [http://localhost:8000/healthz](http://localhost:8000/healthz)  
-- Metrics: [http://localhost:8000/metrics](http://localhost:8000/metrics)
+### 2. **Prometheus Operator**
+- Installed via Helm (`kube-prometheus-stack`).
+- Provides:
+  - `ServiceMonitor` CRDs for scraping metrics.
+  - `PrometheusRule` CRDs for alerting.
+  - Built-in node/pod monitoring.
 
----
+### 3. **Grafana**
+- Installed via Prometheus Operator.
+- Port-forwarded locally:
+  ```bash
+  kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
+  ```
+- Default credentials:
+  - Username: `admin`
+  - Password: from secret:
+    ```bash
+    kubectl get secret monitoring-grafana -n monitoring -o jsonpath="{.data.admin-password}" | base64 --decode
+    ```
 
-## CPU Alert Simulator
-
-Run anomaly detection on a JSONL log stream:
-
-```bash
-python -c "from cpu_alert import check_alert, stream; check_alert(stream(open('cpu.jsonl')))"
-```
-
-You should see alerts and metrics push confirmations.
-
----
-
-## Docker
-
-```bash
-docker build -t anomaly:v0.1.1 .
-docker run -p 8000:8000 anomaly:v0.1.1
-```
-
----
-
-## Kubernetes
-
-```bash
-kubectl apply -f deploy.yaml
-kubectl get pods
-kubectl port-forward service/anomaly-service 8000:8000
-```
-
-Test:
-```bash
-curl http://localhost:8000/healthz
-```
+### 4. **Prometheus Rules**
+- Custom `PrometheusRule` deployed via:
+  ```bash
+  kubectl apply -f prometheus-rules.yaml
+  ```
+- Example: Trigger alert when CPU usage > 90% for 1m.
 
 ---
 
-## Prometheus & Alerting
+## ⚙️ Deployment Steps
 
-- Apply `servicemonitor.yaml` to scrape `/metrics`  
-- Apply `prometheus-rules.yaml` to alert on high CPU usage (>90% for 5m)  
-- Alerts flow into **Alertmanager** (configure routes e.g., Slack/email)
+1. **Deploy Anomaly Service**
+   ```bash
+   kubectl apply -f anomaly-deployment.yaml
+   kubectl apply -f anomaly-service.yaml
+   ```
 
----
+2. **Verify Pods**
+   ```bash
+   kubectl get pods -l app=anomaly
+   kubectl logs <anomaly-pod>
+   ```
 
-## ✅ Verification Checklist
+3. **Install Prometheus Operator**
+   ```bash
+   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+   helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
+   ```
 
-### 1. Local Development
-- [ ] Run `uvicorn main:app --port 8000 --reload`
-- [ ] `/healthz`, `/metrics`, `/predict` return correct responses
-- [ ] `cpu_alert.py` detects anomalies using `cpu.jsonl`
+4. **Create ServiceMonitor**
+   ```bash
+   kubectl apply -f servicemonitor.yaml
+   ```
 
-### 2. Docker
-- [ ] Build image `anomaly:v0.1.1`
-- [ ] Run with `docker run -p 8000:8000 anomaly:v0.1.1`
-- [ ] Test endpoints inside container
+5. **Create Alerts**
+   ```bash
+   kubectl apply -f prometheus-rules.yaml
+   ```
 
-### 3. Kubernetes
-- [ ] Deploy with `kubectl apply -f deploy.yaml`
-- [ ] Pods in `Running` state
-- [ ] Port-forward service → verify `/healthz`, `/metrics`
-
-### 4. Prometheus
-- [ ] `ServiceMonitor` applied
-- [ ] Target `anomaly-service` is `UP`
-- [ ] `cpu_usage_percent` visible in Prometheus
-
-### 5. Alertmanager
-- [ ] `PrometheusRule` applied
-- [ ] `HighCPUUsage` alert fires on sustained load
-- [ ] Alert routes to configured channel (Slack/email)
-
-### 6. CI/CD
-- [ ] Commit and push → GitHub Actions builds/pushes Docker image
-- [ ] Deployment updated to pull image from registry
+6. **Access Grafana**
+   ```bash
+   kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
+   ```
 
 ---
 
-## 📊 Architecture Diagram
+## 📊 Grafana Dashboard
 
-```mermaid
-flowchart LR
-    subgraph Client
-    User[User / DevOps Engineer]
-    end
+- **Panel 1:** CPU Usage Percent per Pod  
+  PromQL:
+  ```promql
+  cpu_usage_percent{pod=~".*anomaly.*"}
+  ```
 
-    subgraph Kubernetes
-    A[FastAPI App<br/>/healthz /metrics /predict]
-    B[Prometheus Operator]
-    C[Alertmanager]
-    end
+- **Panel 2:** Average CPU Usage (Namespace)  
+  PromQL:
+  ```promql
+  avg(cpu_usage_percent) by (namespace)
+  ```
 
-    subgraph GitHub
-    D[GitHub Actions CI/CD]
-    end
-
-    User -->|Requests /predict, /metrics| A
-    A -->|Expose metrics| B
-    B -->|Alerts on CPU usage >90%| C
-    D -->|Build & Push Docker image| A
-```
+- **Alerts:**  
+  Highlight high CPU spikes > 90%.  
 
 ---
 
-## License
-MIT (or add your own)
+## ✅ Verification
+
+- Run CPU stress test inside pod:
+  ```bash
+  kubectl exec -it <anomaly-pod> -- sh
+  yes > /dev/null &
+  ```
+- Watch CPU spikes in Grafana (`CPU Anomaly Dashboard`).
+
+---
+
+## 🚀 Next Steps
+- Add **alertmanager config** to send alerts (Slack/Email).
+- Enable **Grafana variables** for pod/namespace filtering.
+- Automate dashboard import with JSON configs.
