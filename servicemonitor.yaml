@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: anomaly-servicemonitor
+  labels:
+    release: prometheus  # <-- adjust if your Prometheus Operator install uses a different release label
+spec:
+  selector:
+    matchLabels:
+      app: anomaly
+  namespaceSelector:
+    matchNames:
+      - default  # <-- change if your service runs in another namespace
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scheme: http
