@@ -2,17 +2,18 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: anomaly-servicemonitor
+  namespace: default
   labels:
-    release: prometheus  # adjust if your Prometheus Operator uses a different label
+    release: monitoring   # IMPORTANT: matches Prometheus Operator release label
 spec:
   selector:
     matchLabels:
-      app: anomaly   # must match the label on your Service
+      app: anomaly
   namespaceSelector:
     matchNames:
-      - default      # ensure it looks into the "default" namespace
+      - default
   endpoints:
-    - port: http     # must match the port name in your Service
+    - port: http
       path: /metrics
       interval: 15s
       scheme: http
