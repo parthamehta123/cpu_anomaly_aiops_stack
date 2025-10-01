@@ -22,8 +22,8 @@ spec:
     spec:
       containers:
         - name: anomaly
-          image: anomaly:v0.1.1
-          imagePullPolicy: IfNotPresent
+          image: anomaly:v0.1.1   # your locally built image
+          imagePullPolicy: Never  # force Kubernetes to use local image
           ports:
             - containerPort: 8000
               name: http
