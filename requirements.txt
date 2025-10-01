@@ -5,3 +5,4 @@ torch
 evidently
 pyspark
 requests
+psutil
