@@ -3,16 +3,16 @@ kind: ServiceMonitor
 metadata:
   name: anomaly-servicemonitor
   labels:
-    release: prometheus  # <-- adjust if your Prometheus Operator install uses a different release label
+    release: prometheus  # adjust if your Prometheus Operator uses a different label
 spec:
   selector:
     matchLabels:
-      app: anomaly
+      app: anomaly   # must match the label on your Service
   namespaceSelector:
     matchNames:
-      - default  # <-- change if your service runs in another namespace
+      - default      # ensure it looks into the "default" namespace
   endpoints:
-    - port: http
+    - port: http     # must match the port name in your Service
       path: /metrics
       interval: 15s
       scheme: http
