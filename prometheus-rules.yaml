@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: anomaly-alert-rules
+  labels:
+    release: prometheus  # <-- adjust to your Prometheus Operator release label
+spec:
+  groups:
+    - name: anomaly.rules
+      rules:
+        - alert: HighCPUUsage
+          expr: cpu_usage_percent > 90
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage detected"
+            description: "CPU usage has been above 90% for more than 5 minutes in anomaly-service pods."
